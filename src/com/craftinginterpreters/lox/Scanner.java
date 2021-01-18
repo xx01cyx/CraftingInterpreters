@@ -36,7 +36,7 @@ class Scanner {
         keywords.put("var", VAR);
         keywords.put("while", WHILE);
     }
-    
+
     Scanner(String source) {
         this.source = source;
     }
@@ -68,9 +68,11 @@ class Scanner {
             case '>': addToken(match('=') ? GREATER_EQUAL : GREATER); break;
             case '<': addToken(match('=') ? LESS_EQUAL : LESS); break;
             case '/':
-                if (match('/'))
-                    while (peek() != '\n' && !isAtEnd())
-                        advance();
+                if (match('/'))    // one-line comment `// ...`
+                    skipOneLineComment();
+                else if (match('*')) {    // multi-line comment `/* ... */`
+                    skipMultiLineComment();
+                }
                 else
                     addToken(SLASH);
                 break;
@@ -91,7 +93,29 @@ class Scanner {
         }
     }
 
-    // One subcase of `ScanToken`
+    private void skipOneLineComment() {
+        while (peek() != '\n' && !isAtEnd())
+            advance();
+    }
+
+    private void skipMultiLineComment() {
+        while (!isAtEnd()) {
+
+            if (advance() == '/') {   // nested comment
+                if (match('*'))
+                    skipMultiLineComment();
+            }
+            else
+                goBack();
+
+            if (peek() == '\n')
+                line++;
+
+            if (advance() == '*' && advance() == '/')
+                return;
+        }
+    }
+
     private void scanString() {
         while (peek() != '"' && !isAtEnd()) {
             if (peek() == '\n') line++;    // Lox supports multi-line strings
@@ -111,7 +135,6 @@ class Scanner {
         addToken(STRING, value);
     }
 
-    // The other subcase of `ScanToken`
     private void scanNumber() {
         while (isDigit(peek()))    // Integral part
             advance();
@@ -126,7 +149,6 @@ class Scanner {
         addToken(NUMBER, Double.parseDouble(value));
     }
 
-    // Another subcase of `ScanToken`
     private void scanIdentifier() {
         while (isAlphaNumeric(peek()))  advance();
         String text = source.substring(start, current);
@@ -156,7 +178,7 @@ class Scanner {
 
     private boolean isAlpha(char c) {
         return (c >= 'a' && c <= 'z') ||
-               (c >= 'A' && c <= 'Z') ||
+                (c >= 'A' && c <= 'Z') ||
                 c == '_';
     }
 
@@ -170,7 +192,12 @@ class Scanner {
         return source.charAt(current - 1);
     }
 
-    // Check if the next character matches the expected one
+    // Go back one character
+    private void goBack() {
+        current--;
+    }
+
+    // Check if the character that `current` is pointing to matches the expected one
     private boolean match(char expected) {
         if (isAtEnd())  return false;
 
