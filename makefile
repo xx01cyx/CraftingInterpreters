@@ -18,6 +18,7 @@ run: classes
 	$(JVM) $(MAIN)
 
 test: classes
+	mkdir -p output
 	$(JVM) $(MAIN) test/test1.txt > output/output1.txt
 
 tool: $(TOOLPATH)/*.java
