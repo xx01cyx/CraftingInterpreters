@@ -62,7 +62,10 @@ class Interpreter implements Expr.Visitor<Object> {
                 return (double)left * (double)right;
             case SLASH:
                 checkNumberOperands(expr.operator, left, right);
-                return (double)left / (double)right;
+                double leftOperand = (double)left;
+                double rightOperand = (double)right;
+                checkValidDivision(expr.operator, leftOperand, rightOperand);
+                return leftOperand / rightOperand;
 
             // Comparison operators
             case GREATER:
@@ -98,6 +101,17 @@ class Interpreter implements Expr.Visitor<Object> {
         return expr.accept(this);
     }
 
+    private String stringify(Object object) {
+        if (object == null)  return "nil";
+        if (object instanceof Double) {
+            String text = object.toString();
+            if (text.endsWith(".0"))
+                text = text.substring(0, text.length() - 2);
+            return text;
+        }
+        return object.toString();
+    }
+
     // `false` and `nil` are falsey and everything else is truthy
     private boolean isTruthy(Object object) {
         if (object == null)  return false;
@@ -123,14 +137,8 @@ class Interpreter implements Expr.Visitor<Object> {
         throw new RuntimeError(operator, "Operands must be numbers.");
     }
 
-    private String stringify(Object object) {
-        if (object == null)  return "nil";
-        if (object instanceof Double) {
-            String text = object.toString();
-            if (text.endsWith(".0"))
-                text = text.substring(0, text.length() - 2);
-            return text;
-        }
-        return object.toString();
+    private void checkValidDivision(Token operator, double left, double right) {
+        if (right == 0)
+            throw new RuntimeError(operator, "Invalid division.");
     }
 }
