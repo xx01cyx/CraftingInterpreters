@@ -19,7 +19,7 @@ run: classes
 
 test: classes
 	mkdir -p output
-	$(JVM) $(MAIN) test/test1.txt > output/output1.txt
+	$(JVM) $(MAIN) test/test2.txt > output/output2.txt
 
 tool: $(TOOLPATH)/*.java
 	$(JC) $(JFLAG) . $^
