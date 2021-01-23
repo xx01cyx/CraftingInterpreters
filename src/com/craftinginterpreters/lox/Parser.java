@@ -2,6 +2,7 @@ package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
 
 import static com.craftinginterpreters.lox.TokenType.*;
 
@@ -50,6 +51,12 @@ class Parser {
     private Stmt statement() {
         if (match(PRINT))
             return printStatement();
+        if (match(IF))
+            return ifStatement();
+        if (match(WHILE))
+            return whileStatement();
+        if (match(FOR))
+            return forStatement();
         if (match(LEFT_BRACE))
             return new Stmt.Block(block());
         return expressionStatement();
@@ -77,6 +84,68 @@ class Parser {
         return statements;
     }
 
+    private Stmt ifStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after if condition.");
+
+        Stmt thenBranch = statement();
+        Stmt elseBranch = null;
+        if (match(ELSE))
+            elseBranch = statement();
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
+    }
+
+    private Stmt whileStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after while condition.");
+
+        Stmt body = statement();
+
+        return new Stmt.While(condition, body);
+    }
+
+    private Stmt forStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+        Stmt initializer;
+        if (match(SEMICOLON))
+            initializer = null;
+        else if (match(VAR))
+            initializer = varDeclaration();
+        else
+            initializer = expressionStatement();
+
+        Expr condition = null;
+        if (!check(SEMICOLON))
+            condition = expression();
+        consume(SEMICOLON, "Expect ';' after loop condition.");
+
+        Expr increment = null;
+        if (!check(RIGHT_PAREN))
+            increment = expression();
+        consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        Stmt body = statement();
+
+
+        // Scrabble up
+
+        if (increment != null)
+            body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+
+        if (condition == null)
+            condition = new Expr.Literal(true);
+        body = new Stmt.While(condition, body);
+
+        if (initializer != null)
+            body = new Stmt.Block(Arrays.asList(initializer, body));
+
+        return body;
+    }
+
     // Expression
 
     private Expr expression() {
@@ -84,7 +153,7 @@ class Parser {
     }
 
     private Expr assignment() {
-        Expr expression = equality();   // L-value might be an expression (e.g. `newPoint(x+2, 0).y`)
+        Expr expression = or();   // L-value might be an expression (e.g. `newPoint(x+2, 0).y`)
 
         if (match(EQUAL)) {
             Token equals = previous();  // The EQUAL token
@@ -95,6 +164,30 @@ class Parser {
                 return new Expr.Assign(name, value);
             }
             error(equals, "Invalid assignment target.");
+        }
+
+        return expression;
+    }
+
+    private Expr or() {
+        Expr expression = and();
+
+        if (match(OR)) {
+            Token operator = previous();
+            Expr right = and();
+            expression = new Expr.Logical(expression, operator, right);
+        }
+
+        return expression;
+    }
+
+    private Expr and() {
+        Expr expression = equality();
+
+        if (match(AND)) {
+            Token operator = previous();
+            Expr right = equality();
+            expression = new Expr.Logical(expression, operator, right);
         }
 
         return expression;
