@@ -1,12 +1,21 @@
-// This is a test for the scanner
+// Test codes for nested scopes.
 
-var a = 5, b = false;
-
-/* Continue your journey!
-   /*/* Here is a nested comment */*/
-   // Here is another nested comment
-   Good luck! */
-
-if (a < 6 && !b) {    // You will have an error here, since `&&` should be written as `and` in Lox
-	print "Hello Lox!";
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
 }
+print a;
+print b;
+print c;
