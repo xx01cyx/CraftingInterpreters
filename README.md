@@ -3,11 +3,11 @@
 An interpreter for Lox in Java.
 
 ## How to run
-To **run the scanner in command line**, enter:
+To **run the interpreter in command line**, enter:
 ```
 make run
 ```
-To **run the test case for the scanner**, enter:
+To **run the test case for the interpreter**, enter:
 ```
 make test
 ```
