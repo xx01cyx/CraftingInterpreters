@@ -34,6 +34,8 @@ class Parser {
                 return varDeclaration();
             if (match(FUN))
                 return function("function");
+            if (match(CLASS))
+                return classDeclaration();
             return statement();
         } catch (ParseError error) {
             synchronize();
@@ -69,6 +71,18 @@ class Parser {
         List<Stmt> body = block();
 
         return new Stmt.Function(name, parameters, body);
+    }
+
+    private Stmt classDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect class name.");
+        consume(LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd())
+            methods.add(function("method"));
+        consume(RIGHT_BRACE, "Expect '}' after class body");
+
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt statement() {
@@ -220,6 +234,9 @@ class Parser {
             if (expression instanceof Expr.Variable) {  // Assignable
                 Token name = ((Expr.Variable)expression).name;
                 return new Expr.Assign(name, value);
+            } else if (expression instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get)expression;
+                return new Expr.Set(get.object, get.name, value);
             }
             error(equals, "Invalid assignment target.");
         }
@@ -312,9 +329,12 @@ class Parser {
         Expr expr = primary();
 
         while (true) {
-            if (match(LEFT_PAREN))
+            if (match(LEFT_PAREN)) {
                 expr = finishCall(expr);
-            else
+            } else if (match(DOT)) {
+                Token name = consume(IDENTIFIER, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
+            } else
                 break;
         }
 
@@ -328,7 +348,7 @@ class Parser {
             do {
                 if (arguments.size() > 255)
                     // Just report the error instead of throwing it
-                    // Since the parser is still in a valid state except for too many arguments
+                    // since the parser is still in a valid state except for too many arguments
                     error(peek(), "Cannot have more than 255 arguments.");
                 arguments.add(expression());
             } while (match(COMMA));
@@ -342,6 +362,7 @@ class Parser {
         if (match(FALSE)) return new Expr.Literal(false);
         if (match(TRUE)) return new Expr.Literal(true);
         if (match(NIL)) return new Expr.Literal(null);
+        if (match(THIS)) return new Expr.This(previous());
         if (match(STRING, NUMBER))
             return new Expr.Literal(previous().literal);
         if (match(LEFT_PAREN)) {

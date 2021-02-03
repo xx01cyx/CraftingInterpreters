@@ -9,6 +9,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private final Interpreter interpreter;
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
     private FunctionType currentFunction = FunctionType.NONE;
+    private ClassType currentClass = ClassType.NONE;
 
     Resolver(Interpreter interpreter) {
         this.interpreter = interpreter;
@@ -16,7 +17,14 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private enum FunctionType {
         NONE,
-        FUNCTION
+        FUNCTION,
+        INITIALIZER,
+        METHOD
+    }
+
+    private enum ClassType {
+        NONE,
+        CLASS
     }
 
     void resolve(List<Stmt> statements) {
@@ -32,6 +40,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         expr.accept(this);
     }
 
+
     // Statements
 
     @Override
@@ -39,6 +48,33 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         beginScope();
         resolve(stmt.statements);
         endScope();
+        return null;
+    }
+
+    @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = currentClass;
+        currentClass = ClassType.CLASS;
+
+        declare(stmt.name);
+        define(stmt.name);
+
+        // Whenever a `this` expression is encountered, it will resolve to
+        // a “local variable” defined in an implicit scope just outside of
+        // the block for the method body.
+        beginScope();
+        scopes.peek().put("this", true);
+
+        for (Stmt.Function method : stmt.methods) {
+            FunctionType declaration = FunctionType.METHOD;
+            if (method.name.lexeme.equals("init"))
+                declaration = FunctionType.INITIALIZER;
+            resolveFunction(method, declaration);
+        }
+
+        endScope();
+
+        currentClass = enclosingClass;
         return null;
     }
 
@@ -96,6 +132,8 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     public Void visitReturnStmt(Stmt.Return stmt) {
         if (currentFunction == FunctionType.NONE)
             Lox.error(stmt.keyword, "Can't return from top-level code.");
+        else if (currentFunction == FunctionType.INITIALIZER)
+            Lox.error(stmt.keyword, "Can't return a value from an initializer.");
 
         if (stmt.value != null)
             resolve(stmt.value);
@@ -152,6 +190,12 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     }
 
     @Override
+    public Void visitGetExpr(Expr.Get expr) {
+        resolve(expr.object);  // Properties are looked up DYNAMICALLY, so they don't get resolved
+        return null;
+    }
+
+    @Override
     public Void visitGroupingExpr(Expr.Grouping expr) {
         resolve(expr.expression);
         return null;
@@ -190,6 +234,29 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         return null;
     }
 
+    /**
+     * The property is DYNAMICALLY evaluated, so all we need to do
+     * is to resolve the object whose property is being set and
+     * the value it's being set to.
+     */
+    @Override
+    public Void visitSetExpr(Expr.Set expr) {
+        resolve(expr.value);  // Resolve `expr.value` first!
+        resolve(expr.object);
+        return null;
+    }
+
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (currentClass == ClassType.NONE) {
+            Lox.error(expr.keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+
+        resolveLocal(expr, expr.keyword);
+        return null;
+    }
+
     @Override
     public Void visitUnaryExpr(Expr.Unary expr) {
         resolve(expr.right);
@@ -224,7 +291,7 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
         Map<String, Boolean> scope = scopes.peek();
 
-        // Re-declare in the same scope
+        // Re-declaration in the same scope is not allowed
         if (scope.containsKey(name.lexeme))
             Lox.error(name, "Already variable with this name in this scope.");
 
