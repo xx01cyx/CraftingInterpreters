@@ -24,7 +24,8 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     private enum ClassType {
         NONE,
-        CLASS
+        CLASS,
+        SUBCLASS  // Check the validation of `super`
     }
 
     void resolve(List<Stmt> statements) {
@@ -59,6 +60,21 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         declare(stmt.name);
         define(stmt.name);
 
+        boolean hasSuperclass = (stmt.superclass != null);
+
+        if (hasSuperclass && stmt.name.lexeme.equals(stmt.superclass.name.lexeme))
+            Lox.error(stmt.superclass.name, "A class cannot inherit from itself.");
+
+        if (hasSuperclass) {
+            currentClass = ClassType.SUBCLASS;
+            resolve(stmt.superclass);
+        }
+
+        if (hasSuperclass) {
+            beginScope();
+            scopes.peek().put("super", true);
+        }
+
         // Whenever a `this` expression is encountered, it will resolve to
         // a “local variable” defined in an implicit scope just outside of
         // the block for the method body.
@@ -73,6 +89,9 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         }
 
         endScope();
+
+        if (hasSuperclass)
+            endScope();
 
         currentClass = enclosingClass;
         return null;
@@ -243,6 +262,22 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     public Void visitSetExpr(Expr.Set expr) {
         resolve(expr.value);  // Resolve `expr.value` first!
         resolve(expr.object);
+        return null;
+    }
+
+    /**
+     * The resolution for `super` store the hops along the environment
+     * chain that the interpreter has to walk to find the environment
+     * where the superclass is stored.
+     */
+    @Override
+    public Void visitSuperExpr(Expr.Super expr) {
+        if (currentClass == ClassType.NONE)
+            Lox.error(expr.keyword, "Cannot use 'super' outside of a class.");
+        else if (currentClass != ClassType.SUBCLASS)
+            Lox.error(expr.keyword, "Cannot use 'super' in a class with no superclass.");
+
+        resolveLocal(expr, expr.keyword);
         return null;
     }
 
