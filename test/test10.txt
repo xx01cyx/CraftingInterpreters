@@ -1,0 +1,22 @@
+// Static methods
+
+class Math {
+  static square(n) {
+    return n * n;
+  }
+
+  printPI() {
+  	print 3.1415926;
+  }
+}
+
+print Math.square(3);
+Math().printPI();
+
+
+print Math().square(4);  // Runtime error
+
+static greet() {  		 // Parse error
+	print "Hello Lox!";
+}
+

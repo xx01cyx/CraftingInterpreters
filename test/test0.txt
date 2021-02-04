@@ -16,3 +16,9 @@ while (a >= 0) {
 	if (a == 4)
 		break;
 }
+
+class Math {
+  static square(n) {
+    return n * n;
+  }
+}
