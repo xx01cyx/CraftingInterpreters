@@ -81,11 +81,17 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
         beginScope();
         scopes.peek().put("this", true);
 
-        for (Stmt.Function method : stmt.methods) {
+        for (Stmt.Function nonstaticMethod : stmt.nonstaticMethods) {
             FunctionType declaration = FunctionType.METHOD;
-            if (method.name.lexeme.equals("init"))
+            if (nonstaticMethod.name.lexeme.equals("init"))
                 declaration = FunctionType.INITIALIZER;
-            resolveFunction(method, declaration);
+            resolveFunction(nonstaticMethod, declaration);
+        }
+
+        for (Stmt.Function staticMethod : stmt.staticMethods) {
+            if (staticMethod.name.lexeme.equals("init"))
+                Lox.error(staticMethod.name, "Init method of a class cannot be static.");
+            resolveFunction(staticMethod, FunctionType.METHOD);
         }
 
         endScope();

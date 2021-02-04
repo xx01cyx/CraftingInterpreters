@@ -183,10 +183,17 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     @Override
     public Object visitGetExpr(Expr.Get expr) {
         Object object = evaluate(expr.object);
-        if (object instanceof LoxInstance) {
+
+        if (object instanceof LoxInstance)
             return ((LoxInstance)object).get(expr.name);
+        else if (object instanceof LoxClass) {  // Can only get static methods from a class
+            LoxFunction staticMethod = ((LoxClass) object).findMethod(expr.name.lexeme);
+            if (!staticMethod.isStatic)
+                throw new RuntimeError(expr.name, "Only classes allow calls for static methods.");
+            return staticMethod;
         }
-        throw new RuntimeError(expr.name, "Only instances have properties.");
+
+        throw new RuntimeError(expr.name, "Only classes or instances have properties.");
     }
 
     @Override
@@ -281,7 +288,7 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitFunctionStmt(Stmt.Function stmt) {
-        LoxFunction function = new LoxFunction(stmt, environment, false);
+        LoxFunction function = new LoxFunction(stmt, environment, false, false);
         environment.define(stmt.name.lexeme, function);
         return null;
     }
@@ -312,11 +319,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
         }
 
         Map<String, LoxFunction> methods = new HashMap<>();
-        for (Stmt.Function method : stmt.methods) {
-            LoxFunction function = new LoxFunction(method, environment,
-                    method.name.lexeme.equals("init"));
-            methods.put(method.name.lexeme, function);
+        for (Stmt.Function nonstaticMethod : stmt.nonstaticMethods) {
+            LoxFunction function = new LoxFunction(nonstaticMethod, environment,
+                    nonstaticMethod.name.lexeme.equals("init"), false);
+            methods.put(nonstaticMethod.name.lexeme, function);
         }
+        for (Stmt.Function staticMethod : stmt.staticMethods) {
+            LoxFunction function = new LoxFunction(staticMethod, environment, false, true);
+            methods.put(staticMethod.name.lexeme, function);
+        }
+
         LoxClass klass = new LoxClass(stmt.name.lexeme, (LoxClass)superclass, methods);
 
         if (superclass != null)

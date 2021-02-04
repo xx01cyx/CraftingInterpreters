@@ -30,6 +30,9 @@ class Parser {
 
     private Stmt declaration() {
         try {
+            if (match(STATIC))
+                throw error(previous(), "Cannot have a static method outside a class.");
+
             if (match(VAR))
                 return varDeclaration();
             if (match(FUN))
@@ -37,6 +40,7 @@ class Parser {
             if (match(CLASS))
                 return classDeclaration();
             return statement();
+
         } catch (ParseError error) {
             synchronize();
             return null;
@@ -85,11 +89,16 @@ class Parser {
         consume(LEFT_BRACE, "Expect '{' before class body.");
 
         List<Stmt.Function> methods = new ArrayList<>();
-        while (!check(RIGHT_BRACE) && !isAtEnd())
-            methods.add(function("method"));
+        List<Stmt.Function> staticMethods = new ArrayList<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            if (match(STATIC))
+                staticMethods.add(function("method"));
+            else
+                methods.add(function("method"));
+        }
         consume(RIGHT_BRACE, "Expect '}' after class body");
 
-        return new Stmt.Class(name, superclass, methods);
+        return new Stmt.Class(name, superclass, methods, staticMethods);
     }
 
     private Stmt statement() {

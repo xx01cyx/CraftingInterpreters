@@ -34,10 +34,11 @@ abstract class Stmt {
     }
 
     static class Class extends Stmt {
-        Class(Token name, Expr.Variable superclass, List<Stmt.Function> methods) {
+        Class(Token name, Expr.Variable superclass, List<Stmt.Function> nonstaticMethods, List<Stmt.Function> staticMethods) {
             this.name = name;
             this.superclass = superclass;
-            this.methods = methods;
+            this.nonstaticMethods = nonstaticMethods;
+            this.staticMethods = staticMethods;
         }
 
         @Override
@@ -47,7 +48,8 @@ abstract class Stmt {
 
         final Token name;
         final Expr.Variable superclass;
-        final List<Stmt.Function> methods;
+        final List<Stmt.Function> nonstaticMethods;
+        final List<Stmt.Function> staticMethods;
     }
 
     static class Expression extends Stmt {
